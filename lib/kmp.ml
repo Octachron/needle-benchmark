@@ -31,23 +31,25 @@ let compute_backedges needle =
 let execute_search edges ~needle s =
   let nlen = String.length needle in
   let slen = String.length s in
-  let rec search ~npos pos =
+  let rec search edges needle nlen slen ~npos pos s =
     if npos >= nlen then Some (pos-nlen)
     else if pos >= slen then None
     else if needle.[npos] = s.[pos] then
-      search ~npos:(1+npos) (1+pos)
+      search edges needle nlen slen ~npos:(1+npos) (1+pos) s
     else if npos = 0 then
-      search ~npos:0 (1+pos)
+      search edges needle nlen slen ~npos:0 (1+pos) s
     else
       let npos = edges.(npos) in
       if npos < 0 then
-        search ~npos:0 (1+pos)
+        search edges needle nlen slen ~npos:0 (1+pos) s
       else
-        search ~npos pos
+        search edges needle nlen slen ~npos pos s
   in
-  search ~npos:0 0
+  search edges needle nlen slen ~npos:0 0 s
 
 
 let search needle =
   if String.length needle = 0 then fun _ -> Some 0
-  else execute_search ~needle (compute_backedges needle)
+  else
+    let edges = compute_backedges needle in
+    fun s -> execute_search ~needle edges s
