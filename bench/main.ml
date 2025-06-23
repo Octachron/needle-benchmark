@@ -3,15 +3,14 @@ let exp scale () = int_of_float (-. scale *. log (Random.float 1.))
 
 let substring len text =
   let len = len () in
-  let offset = Random.int (String.length text - len) in
+  let tlen = String.length text in
+  let off0 = tlen/2 in
+  let offset = off0 + Random.int (off0 - len) in
   String.sub text offset len
 
-let[@inline never] sample len search text =
-  search (substring len text)
-
-let multisample_shared len search text niter =
+let multisample_shared search ~needle text niter =
   let found = ref 0 in
-  let search = sample len search text in
+  let search = search needle in
   for _i = 1 to niter do
     match search text with
     | None -> ()
@@ -19,10 +18,11 @@ let multisample_shared len search text niter =
   done;
     !found
 
-let multisample len search text niter =
+let multisample search needles text niter =
   let found = ref 0 in
-  for _i = 1 to niter do
-    match sample len search text text with
+  for i = 0 to niter-1 do
+    let needle = needles.(i) in
+    match  search needle text with
     | None -> ()
     | Some _ -> incr found
   done;
@@ -35,14 +35,32 @@ let parse_implem = function
   | "kmp_online" -> Search.Kmp_online.search
   | _ -> Search.Naive.search
 
-let args r = ["-search", Arg.Symbol (implems, (fun s -> r := s)), "implem" ]
+let args ~shared ~niter ~size ~implem = [
+  "-search", Arg.Symbol (implems, (:=) implem), "implem";
+  "-needle-size", Arg.Float ((:=) size), "needle size";
+  "-n-iteration", Arg.Int ((:=) niter), "number of iteration";
+  "-shared", Arg.Bool ((:=) shared), "share needle compilation"
+]
+
+let human_text size =
+  substring (exp size) Text.data
+
 
 let () =
-  let r = ref "" in
-  let shared = ref false in
-  Arg.parse (args r) ignore "main -search {kmp,naive}";
-  let search = parse_implem !r in
-  let niter = 100 in
-  let sampler = if !shared then multisample_shared else multisample in
-  let check = sampler (exp 1000.) search Text.data niter in
+  let implem = ref ""
+  and shared = ref false
+  and niter = ref 100
+  and size = ref 1000. in
+  Arg.parse (args ~implem ~shared ~niter ~size)
+    ignore "main -search {kmp,naive}";
+  let search = parse_implem !implem in
+  let niter = !niter in
+  let check =
+   if !shared then
+      let needle = human_text !size in
+      multisample_shared search ~needle Text.data niter
+   else
+      let needles = Array.init niter (fun _ -> human_text !size) in
+      multisample search needles Text.data niter
+  in
   assert (check=niter)
