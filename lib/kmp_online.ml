@@ -61,3 +61,18 @@ let search needle s =
           search edges ~npos pos
   in
   search (init_backedges needle) ~npos:0 0
+
+
+
+let find_sub ?start:_ ~sub =
+  search sub
+
+let replace_first ?start ~sub:needle ~by s =
+  match find_sub ~start ~sub:needle s with
+  | None -> s
+  | Some i ->
+    let rest_first = i + String.length needle in
+    let rest_len = String.length s - i - String.length needle in
+    String.concat by String.[sub s 0 i; sub s rest_first rest_len]
+
+let replace_all ?start:_ ~sub:_ ~by:_ _ = failwith "Not implemented"
